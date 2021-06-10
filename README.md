@@ -1,10 +1,18 @@
 ## StyleGAN2 Facial Landmark Projection
 
-This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is from the original StyleGAN2 repository [0]. For projection of facial landmarks, the l2 norm of the landmark heatmaps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heatmaps of the landmarks, [1] is used. The objective, thus becomes:
+This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is from the original StyleGAN2 repository [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes:
 
-$loss = \lambda_{lpips} LPIPS(x_{projection}, x_{target\_look})  + \lambda_{landmark}HL(x_{projection}, x_{target\_landmark}) $, with $HL$ being the heatmap loss defined as $HL(x_1, x_2) = \sqrt{\sum_i^N (FAN(x_1) - FAN(x_2))^2}$, where $FAN$ is the landmark extraction model, and $N$ the number of pixels. LPIPS as in [1, 2].
+<img src="https://render.githubusercontent.com/render/math?math=\large loss = \lambda_{lpips} LPIPS(x_{projection}, x_{target\_look}) %2B \lambda_{landmark}HL(x_{projection}, x_{target\_landmark})">, 
 
-Currently the image quality deteriorates quite heavily, when $\lambda_{landmark}$ becomes too big. The LPIPS weight is better kept at 1: $\lambda_{lpips} = 1$. This repository is work in progress. Happy about input.
+with ***HL*** being the heat map loss defined as 
+
+<img src="https://render.githubusercontent.com/render/math?math=\large HL(x_1, x_2) = \sum_i^N \sqrt{(FAN(x_1) - FAN(x_2))^2}">, 
+
+where ***FAN*** is the landmark heat map extraction model, and $N$ the number of pixels. LPIPS as in [1, 2].
+
+
+
+Currently the image quality deteriorates quite heavily, when $\lambda_{landmark}$ becomes too big. The LPIPS weight is better kept at 1: $\lambda_{lpips} = 1$. This repository is work in progress. Happy about input and contributions.
 
 
 
