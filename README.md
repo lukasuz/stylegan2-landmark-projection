@@ -1,3 +1,7 @@
+<img src="./examples/1000_0.1_mouth_10.png" width="1000"/>
+
+
+
 ## StyleGAN2 Facial Landmark Projection
 
 This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is from the original StyleGAN2 repository [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes:
@@ -10,9 +14,9 @@ with ***HL*** being the heat map loss defined as
 
 where ***FAN*** is the landmark heat map extraction model, and *N*​ the number of pixels. LPIPS as in [1, 2].
 
+Currently the image quality deteriorates quite heavily, when <img src="https://render.githubusercontent.com/render/math?math=\lambda_{landmark}"> becomes too big. The LPIPS weight is better kept at 1: <img src="https://render.githubusercontent.com/render/math?math=\lambda_{landmark}=1">. Additionally, it is beneficial to weight certain areas landmarks more than others, i.e. the mouth more than the jaw, more details regarding this can be found in the code or the Google Colab. Examples are given below.
 
-
-Currently the image quality deteriorates quite heavily, when $\lambda_{landmark}$ becomes too big. The LPIPS weight is better kept at 1: $\lambda_{lpips} = 1$. This repository is work in progress. Happy about input and contributions.
+This repository is work in progress. Happy about input and contributions.
 
 
 
@@ -38,23 +42,35 @@ python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-
 
 <img src="./examples/1000_0.png" alt="drawing" width="800"/>
 
+<hr/>
+
 <img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.01"> - Little smirk
 
 <img src="./examples/1000_0.01.png" width="800"/>
+
+<hr/>
 
 <img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.05">- Smiling, but bad quality
 
 <img src="./examples/1000_0.05.png" width="800"/>
 
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.1">- Laughing, but very bad quality
+<hr/>
+
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.1"> -  Laughing, but very bad quality
 
 <img src="./examples/1000_0.1.png" width="800"/>
+
+<hr/>
+
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.01, \lambda_{inner\_lip} = 10, \lambda_{outer\_lip} = 10"> - With higher weights for the mouth area
+
+<img src="./examples/1000_0.1_mouth_10.png" width="800"/>
 
 
 
 ## Todos:
 
-- Allow for different landmark weights via command line. This will probably improve the above example.
+- ~~Allow for different landmark weights via command line. This will probably improve the above example.~~
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
 
