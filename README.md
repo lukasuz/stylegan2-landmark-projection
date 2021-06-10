@@ -27,7 +27,7 @@ pip install click requests tqdm pyspng ninja imageio-ffmpeg==0.4.3 face_alignmen
 and run it like so:
 
 ```bash
-!python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-steps=1000 --outdir=./ --target_look=./look_img.png --target_landmarks=./landmark_img.png --save_video=1  --network=https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/ffhq.pkl
+python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-steps=1000 --outdir=./ --target_look=./look_img.png --target_landmarks=./landmark_img.png --save_video=1  --network=https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/ffhq.pkl
 ```
 
 
@@ -57,7 +57,7 @@ and run it like so:
 - Allow for different landmark weights via command line. This will probably improve the above example.
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
-a
+
 
 ## References
 
