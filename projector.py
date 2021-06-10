@@ -189,6 +189,7 @@ def project(
 @click.option('--outdir',                 help='Where to save the output images', required=True, metavar='DIR')
 @click.option('--save_video',             help='0|1', required=True, default=0, show_default=True)
 @click.option('--device',                 help='cpu|cuda', required=True, default='cuda', show_default=True)
+@click.option('--landmark_weights',       help='land mark weights: jaw, left_eyebrow, right_eyebrow, nose_bridge, lower_nose, left_eye, right_eye, outer_lip, inner_lip', type=str, default='0.05, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0, 1.0, 1.0', show_default=True)
 def run_projection(
     network_pkl: str,
     target_look: str,
@@ -199,7 +200,8 @@ def run_projection(
     num_steps: int,
     landmark_weight: float,
     lpips_weight: float,
-    device: str
+    device: str,
+    landmark_weights: str
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -215,7 +217,8 @@ def run_projection(
     # Load networks.
     print('Loading networks from "%s"...' % network_pkl)
 
-    FLE = FacialLandmarksExtractor(device=device)
+    landmark_weights_array = np.array(landmark_weights.split(','), dtype=np.float)
+    FLE = FacialLandmarksExtractor(device=device, landmark_weights=landmark_weights_array)
 
     device = torch.device(device)
     with dnnlib.util.open_url(network_pkl) as fp:
