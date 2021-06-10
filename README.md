@@ -1,4 +1,4 @@
-<img src="./examples/1000_0.1_mouth_10.png" width="1000"/>
+<img src="./examples/1000_0.1_mouth_4.jpeg" width="1000"/>
 
 
 
