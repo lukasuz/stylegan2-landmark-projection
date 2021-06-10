@@ -8,7 +8,7 @@ with ***HL*** being the heat map loss defined as
 
 <img src="https://render.githubusercontent.com/render/math?math=\large HL(x_1, x_2) = \sum_i^N \sqrt{(FAN(x_1) - FAN(x_2))^2}">, 
 
-where ***FAN*** is the landmark heat map extraction model, and $N$ the number of pixels. LPIPS as in [1, 2].
+where ***FAN*** is the landmark heat map extraction model, and *N*​ the number of pixels. LPIPS as in [1, 2].
 
 
 
@@ -34,19 +34,19 @@ and run it like so:
 
 ## Examples
 
-$\lambda_{landmark} = 0$ - Nothing
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0"> - Nothing
 
 <img src="./examples/1000_0.png" alt="drawing" width="800"/>
 
-$\lambda_{landmark} = 0.01$ - Little smirk
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.01"> - Little smirk
 
 <img src="./examples/1000_0.01.png" width="800"/>
 
-$\lambda_{landmark} = 0.05$ - Smiling, but bad quality
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.05">- Smiling, but bad quality
 
 <img src="./examples/1000_0.05.png" width="800"/>
 
-$\lambda_{landmark} = 0.1$ - Laughing, but very bad quality
+<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.1">- Laughing, but very bad quality
 
 <img src="./examples/1000_0.1.png" width="800"/>
 
@@ -57,7 +57,7 @@ $\lambda_{landmark} = 0.1$ - Laughing, but very bad quality
 - Allow for different landmark weights via command line. This will probably improve the above example.
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
-
+a
 
 ## References
 
