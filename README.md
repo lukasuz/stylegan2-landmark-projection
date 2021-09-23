@@ -71,6 +71,7 @@ python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-
 ## Todos:
 
 - ~~Allow for different landmark weights via command line. This will probably improve the above example.~~
+- Add discriminator loss / regularization. Heat maps are some times wrongly extracted resulting in a **very** wrongly propagated error
 - Check out why the style look of the facial expression image leaks into the projection. Apparently the heat maps contain some "style" signal
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
