@@ -73,8 +73,8 @@ class FacialLandmarksExtractor:
 
         img = torch.nn.functional.interpolate(img, self.resolution)
         # TODO: normalization necessary?
-        # img = img - img.min()
-        # img = img / img.max()
+        img = img - img.min()
+        img = img / img.max()
         # img = 255 * img
 
         out = self.fa.face_alignment_net(img)
@@ -125,6 +125,7 @@ class FacialLandmarksExtractor:
 
     # TODO
     def crop_face(self, img, res):
+        self.fa.face_detector.detect_from_image(img.copy())
         pass
      
     #TODO: def_save_heatmap_img
