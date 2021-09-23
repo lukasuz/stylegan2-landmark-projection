@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 import warnings
 import face_alignment
+from numpy.lib.arraysetops import isin
 import torch
+from face_alignment.utils import crop
 # from torchvision.transforms import Resize
 
 class FacialLandmarksExtractor:
@@ -45,8 +47,15 @@ class FacialLandmarksExtractor:
 
         self.landmark_weights = torch.Tensor(self.landmark_weights).to(device)
 
+    def safely_read(self, obj):
+        if isinstance(obj, str):
+            img = cv2.imread(obj)
+            return img
+        else:
+            return obj
+
     def read_and_extract(self, path):
-        img = cv2.imread(path)
+        img = self.safely_read(path)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         return img, self.extract(img_rgb)
@@ -72,10 +81,8 @@ class FacialLandmarksExtractor:
             raise ValueError("Needs RGB image.")
 
         img = torch.nn.functional.interpolate(img, self.resolution)
-        # TODO: normalization necessary?
         img = img - img.min()
         img = img / img.max()
-        # img = 255 * img
 
         out = self.fa.face_alignment_net(img)
         return out
@@ -123,12 +130,30 @@ class FacialLandmarksExtractor:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    # TODO
-    def crop_face(self, img, res):
-        self.fa.face_detector.detect_from_image(img.copy())
-        pass
+    def get_cropped_img(self, img, res=512):
+        img = self.safely_read(img)
+        detected_faces = self.fa.face_detector.detect_from_image(img.copy())
+
+        if len(detected_faces) == 0:
+            warnings.warn("No face detected.")
+
+        if len(detected_faces) > 1:
+            warnings.warn("Multiple faces detected, choosing first one.")
+
+        d = detected_faces[0] # Choose first face
+
+        center = torch.tensor(
+            [d[2] - (d[2] - d[0]) / 2.0, d[3] - (d[3] - d[1]) / 2.0])
+        center[1] = center[1] - (d[3] - d[1]) * 0.12
+        scale = (d[2] - d[0] + d[3] - d[1]) / self.fa.face_detector.reference_scale
+        
+        img = crop(img, center, scale)
+        
+        return img
      
-    #TODO: def_save_heatmap_img
+    def save_cropped_img(self, img, res=512, save_path="cropped.png"):
+        img = self.get_cropped_img(img, res)
+        cv2.imwrite(save_path, img)
 
     def save_landmarks_img(self, img, landmarks, save_path="output.png"):
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
@@ -203,25 +228,27 @@ class FacialLandmarksExtractor:
 
 
 if __name__ == "__main__":
-    path1 = "./1.png"
-    path2 = "2.jpg"
+    path1 = "2.jpg"
+    # path2 = "2.jpg"
 
     FLE = FacialLandmarksExtractor(device='cpu')
-    img1, landmarks1 = FLE.read_and_extract(path1)
-    img2, landmarks2 = FLE.read_and_extract(path2)
-    batch_test = np.concatenate([np.expand_dims(img1, 0), np.expand_dims(img1, 0)], axis=0)
-    heatmaps = FLE.get_heat_map(batch_test)
-    heatmap1 = heatmaps[0].detach().cpu().numpy()
-    heatmap1 = np.sum(heatmap1, axis=0, keepdims=True)
-    heatmap1 = np.repeat(heatmap1, 3, axis=0)
-    heatmap1 = heatmap1.transpose((1,2,0))
-    # heatmap1 = np.resize(heatmap1, img1.shape[:2])
-    heatmap1 = cv2.resize(heatmap1, img1.shape[:2], interpolation=cv2.INTER_CUBIC)
-    # heat
-    heatmap1 -= heatmap1.min()
-    heatmap1 /= heatmap1.max()
-    heatmap1 *= 255
-    heatmap1 = heatmap1.astype('uint8')
+    FLE.save_cropped_img(path1)
+    # img1, landmarks1 = FLE.read_and_extract(path1)
+    # # img2, landmarks2 = FLE.read_and_extract(path2)
+    # batch_test = np.concatenate([np.expand_dims(img1, 0), np.expand_dims(img1, 0)], axis=0)
+    # heatmaps = FLE.get_heat_map(batch_test)
+    # print(heatmaps.shape)
+    # heatmap1 = heatmaps[0].detach().cpu().numpy()
+    # heatmap1 = np.sum(heatmap1, axis=0, keepdims=True)
+    # heatmap1 = np.repeat(heatmap1, 3, axis=0)
+    # heatmap1 = heatmap1.transpose((1,2,0))
+    # # heatmap1 = np.resize(heatmap1, img1.shape[:2])
+    # heatmap1 = cv2.resize(heatmap1, img1.shape[:2], interpolation=cv2.INTER_CUBIC)
+    # # heat
+    # # heatmap1 -= heatmap1.min()
+    # # heatmap1 /= heatmap1.max()
+    # # heatmap1 *= 255
+    # heatmap1 = heatmap1.astype('uint8')
 
-    FLE.display_landmarks_img(img1, landmarks1)
-    FLE.display_landmarks_img(heatmap1, landmarks1)
+    # FLE.display_landmarks_img(img1, landmarks1)
+    # FLE.display_landmarks_img(heatmap1, landmarks1)
