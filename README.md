@@ -1,4 +1,4 @@
-<img src="./examples/1000_0.1_mouth_4.jpeg" width="1000"/>
+<img src="./examples/focus_mouth.png" width="1000"/>
 
 
 
@@ -12,13 +12,9 @@ with ***HL*** being the heat map loss defined as
 
 <img src="https://render.githubusercontent.com/render/math?math=\large HL(x_1, x_2) = \sum_i^N \sqrt{(FAN(x_1) - FAN(x_2))^2}">, 
 
-where ***FAN*** is the landmark heat map extraction model, and *N*​ the number of pixels. LPIPS as in [1, 2].
-
-Currently the image quality deteriorates quite heavily, when <img src="https://render.githubusercontent.com/render/math?math=\lambda_{landmark}"> becomes too big. The LPIPS weight is better kept at 1: <img src="https://render.githubusercontent.com/render/math?math=\lambda_{landmark}=1">. Additionally, it is beneficial to weight certain areas landmarks more than others, i.e. the mouth more than the jaw, more details regarding this can be found in the code or the Google Colab. Examples are given below.
+where ***FAN*** is the landmark heat map extraction model, and *N*​ the number of pixels. LPIPS as in [1, 2]. The parameter <img src="https://render.githubusercontent.com/render/math?math=\lambda_{landmark}"> is a **vector** containing the weights for each group of landmarks. Groups are for example: Eye brows, eyes, mouth, etc. Check [1] for more info. By tweaking this parameter you can determine what facial features from the landmark you want project into the generated images. See below for an example.
 
 This repository is work in progress. Happy about input and contributions.
-
-
 
 ## How to use
 
@@ -31,42 +27,22 @@ pip install click requests tqdm pyspng ninja imageio-ffmpeg==0.4.3 face_alignmen
 and run it like so:
 
 ```bash
-python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-steps=1000 --outdir=./ --target_look=./look_img.png --target_landmarks=./landmark_img.png --save_video=1  --network=https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/ffhq.pkl
+python projector.py --lpips_weight=1 --landmark_weight=0.05 --device=cuda --num-steps=1000 --outdir=./ --target_look=./look_img.png --target_landmarks=./landmark_img.png --save_video=1  --network=https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/ffhq.pkl
 ```
 
 
 
 ## Examples
 
-These are older images
+Almost no weighting of eyes in <img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark}"> vector, strong focus on mouth area:
 
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0"> - Nothing
-
-<img src="./examples/1000_0.png" alt="drawing" width="800"/>
+<img src="./examples/focus_mouth.png" alt="drawing" width="800"/>
 
 <hr/>
 
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.01"> - Little smirk
+Here the facial landmarks are weighted mostly uniformly:
 
-<img src="./examples/1000_0.01.png" width="800"/>
-
-<hr/>
-
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.05">- Smiling, but bad quality
-
-<img src="./examples/1000_0.05.png" width="800"/>
-
-<hr/>
-
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.1"> -  Laughing, but very bad quality
-
-<img src="./examples/1000_0.1.png" width="800"/>
-
-<hr/>
-
-<img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0.01, \lambda_{inner\_lip} = 10, \lambda_{outer\_lip} = 10"> - With higher weights for the mouth area
-
-<img src="./examples/1000_0.1_mouth_10.png" width="800"/>
+<img src="./examples/uniformly.png" width="800"/>
 
 
 
@@ -91,6 +67,10 @@ These are older images
 
 
 ## License
+
+*This repository is mainly based on the orignal StyleGAN2-Ada code, thus the NVIDIA license applies.*  
+
+
 
 Copyright &copy; 2021, NVIDIA Corporation. All rights reserved.
 
