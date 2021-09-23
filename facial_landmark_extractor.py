@@ -72,9 +72,10 @@ class FacialLandmarksExtractor:
             raise ValueError("Needs RGB image.")
 
         img = torch.nn.functional.interpolate(img, self.resolution)
-        img = img - img.min()
-        img = img / img.max()
-        img = 255 * img
+        # TODO: normalization necessary?
+        # img = img - img.min()
+        # img = img / img.max()
+        # img = 255 * img
 
         out = self.fa.face_alignment_net(img)
         return out
@@ -121,6 +122,12 @@ class FacialLandmarksExtractor:
 
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
+    # TODO
+    def crop_face(self, img, res):
+        pass
+     
+    #TODO: def_save_heatmap_img
 
     def save_landmarks_img(self, img, landmarks, save_path="output.png"):
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
