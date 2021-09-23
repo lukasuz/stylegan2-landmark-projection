@@ -38,6 +38,8 @@ python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-
 
 ## Examples
 
+These are older images
+
 <img src="https://render.githubusercontent.com/render/math?math=\large \lambda_{landmark} = 0"> - Nothing
 
 <img src="./examples/1000_0.png" alt="drawing" width="800"/>
@@ -71,8 +73,9 @@ python projector.py --lpips_weight=1 --landmark_weight=0.01 --device=cuda --num-
 ## Todos:
 
 - ~~Allow for different landmark weights via command line. This will probably improve the above example.~~
+- ~~Check out why the style look of the facial expression image leaks into the projection. Apparently the heat maps contain some "style" signal~~ (normalization factor in heat map calculation was the culprit, seems to work quite well now. This also improved quality of generated images immensely)
+- Add face cropping as preprocessing for non ffhq images
 - Add discriminator loss / regularization. Heat maps are some times wrongly extracted resulting in a **very** wrongly propagated error
-- Check out why the style look of the facial expression image leaks into the projection. Apparently the heat maps contain some "style" signal
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
 
