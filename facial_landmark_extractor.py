@@ -134,7 +134,8 @@ class FacialLandmarksExtractor:
     def get_cropped_img(self, path_or_img, output_size=512, transform_size=4096, enable_padding=True):
         """ Face alignment crop from https://gist.github.com/lzhbrian/bde87ab23b499dd02ba4f588258f57d5
         """
-        lms = self.fa.get_landmarks_from_image(path_or_img)
+        cv_img = self.safely_read(path_or_img) # face_alignment has a problem with png images
+        lms = self.fa.get_landmarks_from_image(cv_img)
         if len(lms) == 0:
             warnings.warn("No face detected.")
 
@@ -210,10 +211,10 @@ class FacialLandmarksExtractor:
      
     def save_cropped_img(self, img_or_path, res=512, save_path="cropped.png"):
         pil_img = self.get_cropped_img(img_or_path, res)
-        img = np.array(pil_img) 
-        img = img[:, :, ::-1].copy() 
-        cv2.imwrite(save_path, img)
-        # img.save(save_path)
+        # img = np.array(pil_img) 
+        # img = img[:, :, ::-1].copy() 
+        # cv2.imwrite(save_path, img)
+        pil_img.save(save_path)
 
     def save_landmarks_img(self, img, landmarks, save_path="output.png"):
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
@@ -288,7 +289,7 @@ class FacialLandmarksExtractor:
 
 
 if __name__ == "__main__":
-    path1 = "2.jpg"
+    path1 = "look_img(26).png"
     # path2 = "2.jpg"
 
     FLE = FacialLandmarksExtractor(device='cpu')
