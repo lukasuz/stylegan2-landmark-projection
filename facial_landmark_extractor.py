@@ -4,8 +4,8 @@ import warnings
 import face_alignment
 from numpy.lib.arraysetops import isin
 import torch
-from face_alignment.utils import crop
-# from torchvision.transforms import Resize
+import PIL.Image
+import scipy.ndimage
 
 class FacialLandmarksExtractor:
     def __init__(self, device='cuda', landmark_weights=None):
@@ -25,6 +25,7 @@ class FacialLandmarksExtractor:
             'outer_lip': (48, 59),
             'inner_lip': (60, 67)
         }
+        
         self.center_index = 27
 
         if landmark_weights is None:
@@ -130,30 +131,86 @@ class FacialLandmarksExtractor:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    def get_cropped_img(self, img, res=512):
-        img = self.safely_read(img)
-        detected_faces = self.fa.face_detector.detect_from_image(img.copy())
-
-        if len(detected_faces) == 0:
+    def get_cropped_img(self, path_or_img, output_size=512, transform_size=4096, enable_padding=True):
+        """ Face alignment crop from https://gist.github.com/lzhbrian/bde87ab23b499dd02ba4f588258f57d5
+        """
+        lms = self.fa.get_landmarks_from_image(path_or_img)
+        if len(lms) == 0:
             warnings.warn("No face detected.")
 
-        if len(detected_faces) > 1:
+        if len(lms) > 1:
             warnings.warn("Multiple faces detected, choosing first one.")
 
-        d = detected_faces[0] # Choose first face
+        lm = lms[0]
 
-        center = torch.tensor(
-            [d[2] - (d[2] - d[0]) / 2.0, d[3] - (d[3] - d[1]) / 2.0])
-        center[1] = center[1] - (d[3] - d[1]) * 0.12
-        scale = (d[2] - d[0] + d[3] - d[1]) / self.fa.face_detector.reference_scale
-        
-        img = crop(img, center, scale)
-        
+        lm_eye_left      = lm[36 : 42]  # left-clockwise
+        lm_eye_right     = lm[42 : 48]  # left-clockwise
+        lm_mouth_outer   = lm[48 : 60]  # left-clockwise
+
+        # Calculate auxiliary vectors.
+        eye_left     = np.mean(lm_eye_left, axis=0)
+        eye_right    = np.mean(lm_eye_right, axis=0)
+        eye_avg      = (eye_left + eye_right) * 0.5
+        eye_to_eye   = eye_right - eye_left
+        mouth_left   = lm_mouth_outer[0]
+        mouth_right  = lm_mouth_outer[6]
+        mouth_avg    = (mouth_left + mouth_right) * 0.5
+        eye_to_mouth = mouth_avg - eye_avg
+
+        # Choose oriented crop rectangle.
+        x = eye_to_eye - np.flipud(eye_to_mouth) * [-1, 1]
+        x /= np.hypot(*x)
+        x *= max(np.hypot(*eye_to_eye) * 2.0, np.hypot(*eye_to_mouth) * 1.8)
+        y = np.flipud(x) * [-1, 1]
+        c = eye_avg + eye_to_mouth * 0.1
+        quad = np.stack([c - x - y, c - x + y, c + x + y, c + x - y])
+        qsize = np.hypot(*x) * 2
+
+        # read image
+        img = PIL.Image.open(path_or_img)        
+
+        # Shrink.
+        shrink = int(np.floor(qsize / output_size * 0.5))
+        if shrink > 1:
+            rsize = (int(np.rint(float(img.size[0]) / shrink)), int(np.rint(float(img.size[1]) / shrink)))
+            img = img.resize(rsize, PIL.Image.ANTIALIAS)
+            quad /= shrink
+            qsize /= shrink
+
+        # Crop.
+        border = max(int(np.rint(qsize * 0.1)), 3)
+        crop = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), int(np.ceil(max(quad[:,1]))))
+        crop = (max(crop[0] - border, 0), max(crop[1] - border, 0), min(crop[2] + border, img.size[0]), min(crop[3] + border, img.size[1]))
+        if crop[2] - crop[0] < img.size[0] or crop[3] - crop[1] < img.size[1]:
+            img = img.crop(crop)
+            quad -= crop[0:2]
+
+        # Pad.
+        pad = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), int(np.ceil(max(quad[:,1]))))
+        pad = (max(-pad[0] + border, 0), max(-pad[1] + border, 0), max(pad[2] - img.size[0] + border, 0), max(pad[3] - img.size[1] + border, 0))
+        if enable_padding and max(pad) > border - 4:
+            pad = np.maximum(pad, int(np.rint(qsize * 0.3)))
+            img = np.pad(np.float32(img), ((pad[1], pad[3]), (pad[0], pad[2]), (0, 0)), 'reflect')
+            h, w, _ = img.shape
+            y, x, _ = np.ogrid[:h, :w, :1]
+            mask = np.maximum(1.0 - np.minimum(np.float32(x) / pad[0], np.float32(w-1-x) / pad[2]), 1.0 - np.minimum(np.float32(y) / pad[1], np.float32(h-1-y) / pad[3]))
+            blur = qsize * 0.02
+            img += (scipy.ndimage.gaussian_filter(img, [blur, blur, 0]) - img) * np.clip(mask * 3.0 + 1.0, 0.0, 1.0)
+            img += (np.median(img, axis=(0,1)) - img) * np.clip(mask, 0.0, 1.0)
+            img = PIL.Image.fromarray(np.uint8(np.clip(np.rint(img), 0, 255)), 'RGB')
+            quad += pad[:2]
+
+        # Transform.
+        img = img.transform((transform_size, transform_size), PIL.Image.QUAD, (quad + 0.5).flatten(), PIL.Image.BILINEAR)
+        if output_size < transform_size:
+            img = img.resize((output_size, output_size), PIL.Image.ANTIALIAS)
+
         return img
+
      
     def save_cropped_img(self, img, res=512, save_path="cropped.png"):
         img = self.get_cropped_img(img, res)
-        cv2.imwrite(save_path, img)
+        img.save(save_path)
 
     def save_landmarks_img(self, img, landmarks, save_path="output.png"):
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
@@ -233,22 +290,3 @@ if __name__ == "__main__":
 
     FLE = FacialLandmarksExtractor(device='cpu')
     FLE.save_cropped_img(path1)
-    # img1, landmarks1 = FLE.read_and_extract(path1)
-    # # img2, landmarks2 = FLE.read_and_extract(path2)
-    # batch_test = np.concatenate([np.expand_dims(img1, 0), np.expand_dims(img1, 0)], axis=0)
-    # heatmaps = FLE.get_heat_map(batch_test)
-    # print(heatmaps.shape)
-    # heatmap1 = heatmaps[0].detach().cpu().numpy()
-    # heatmap1 = np.sum(heatmap1, axis=0, keepdims=True)
-    # heatmap1 = np.repeat(heatmap1, 3, axis=0)
-    # heatmap1 = heatmap1.transpose((1,2,0))
-    # # heatmap1 = np.resize(heatmap1, img1.shape[:2])
-    # heatmap1 = cv2.resize(heatmap1, img1.shape[:2], interpolation=cv2.INTER_CUBIC)
-    # # heat
-    # # heatmap1 -= heatmap1.min()
-    # # heatmap1 /= heatmap1.max()
-    # # heatmap1 *= 255
-    # heatmap1 = heatmap1.astype('uint8')
-
-    # FLE.display_landmarks_img(img1, landmarks1)
-    # FLE.display_landmarks_img(heatmap1, landmarks1)
