@@ -208,9 +208,12 @@ class FacialLandmarksExtractor:
         return img
 
      
-    def save_cropped_img(self, img, res=512, save_path="cropped.png"):
-        img = self.get_cropped_img(img, res)
-        img.save(save_path)
+    def save_cropped_img(self, img_or_path, res=512, save_path="cropped.png"):
+        pil_img = self.get_cropped_img(img_or_path, res)
+        img = np.array(pil_img) 
+        img = img[:, :, ::-1].copy() 
+        cv2.imwrite(save_path, img)
+        # img.save(save_path)
 
     def save_landmarks_img(self, img, landmarks, save_path="output.png"):
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
