@@ -44,13 +44,14 @@ Here the facial landmarks are weighted mostly uniformly:
 
 <img src="./examples/uniformly.png" width="800"/>
 
-
+Images from [FFHQ](https://github.com/NVlabs/ffhq-dataset) data set.
 
 ## Todos:
 
 - ~~Allow for different landmark weights via command line. This will probably improve the above example.~~
 - ~~Check out why the style look of the facial expression image leaks into the projection. Apparently the heat maps contain some "style" signal~~ (normalization factor in heat map calculation was the culprit, seems to work quite well now. This also improved quality of generated images immensely)
 - ~~Add face cropping as preprocessing for non ffhq images~~
+- Face cropping does not match completly ffhq preprocessing, also uniform background are degrading results strongly. Improve face cropping.
 - Add discriminator loss / regularization. Heat maps are some times wrongly extracted resulting in a **very** wrongly propagated error
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
