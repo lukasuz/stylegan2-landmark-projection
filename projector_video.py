@@ -296,7 +296,6 @@ def run_projection(
         target_landmarks_w_landmarks_uint8 = FLE._draw_landmarks_on_img(
             target_landmarks_uint8, target_landmarks)
 
-
         # Determine amount of steps
         iter_steps = num_steps
         if i == 0:
@@ -329,9 +328,9 @@ def run_projection(
         # target_pil_look.save(f'{outdir}/target_look.png')
         # target_pil_landmarks.save(f'{outdir}/target_landmarks.png')
         # projected_w = projected_w_steps[-1]
-        # synth_image = G.synthesis(projected_w.unsqueeze(0), noise_mode='const')
+        synth_image = G.synthesis(w_opt_save, noise_mode='const')
         # print(i,f'{outdir}/proj_{0}.png'.format(i))
-        # synth_image = (synth_image + 1) * (255/2)
+        synth_image = (synth_image + 1) * (255/2)
         synth_image = synth_image.permute(0, 2, 3, 1).clamp(
             0, 255).to(torch.uint8)[0].cpu().numpy()
         PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj_{i}.png')
