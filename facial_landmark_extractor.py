@@ -6,6 +6,9 @@ from numpy.lib.arraysetops import isin
 import torch
 import PIL.Image
 import scipy.ndimage
+import os
+
+from torch._C import Value
 
 class FacialLandmarksExtractor:
     def __init__(self, device='cuda', landmark_weights=None):
@@ -167,8 +170,9 @@ class FacialLandmarksExtractor:
         quad = np.stack([c - x - y, c - x + y, c + x + y, c + x - y])
         qsize = np.hypot(*x) * 2
 
-        # read image
-        img = PIL.Image.open(path_or_img)        
+        # convert pil (code from the internet works with pil. TODO: refactor)
+        # img = PIL.Image.open(path_or_img)  
+        img = self._cv_to_pil_img(cv_img)      
 
         # Shrink.
         shrink = int(np.floor(qsize / output_size * 0.5))
@@ -209,10 +213,9 @@ class FacialLandmarksExtractor:
         return img
 
      
-    def save_cropped_img(self, img_or_path, res=512, save_path="cropped.png"):
+    def save_cropped_img(self, img_or_path, res=512, save_path="cropped1.png"):
         pil_img = self.get_cropped_img(img_or_path, res)
-        # img = np.array(pil_img) 
-        # img = img[:, :, ::-1].copy() 
+        
         # cv2.imwrite(save_path, img)
         pil_img.save(save_path)
 
@@ -220,6 +223,36 @@ class FacialLandmarksExtractor:
         landmarks_img = self._draw_landmarks_on_img(img, landmarks)
 
         cv2.imwrite(save_path, landmarks_img)
+
+    def _pil_to_cv_img(self, img):
+        img = np.array(img) 
+        img = img[:, :, ::-1].copy() 
+        return img
+
+    def _cv_to_pil_img(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        im_pil = PIL.Image.fromarray(img)
+        return im_pil
+
+    def crop_folder(self, video_path, res, outdir):
+
+        os.makedirs(outdir, exist_ok=True)
+        cap = cv2.VideoCapture(video_path)
+        i = 0
+        while(cap.isOpened()):
+            ret, frame = cap.read()
+            if ret == False:
+                break
+
+            cropped_frame = self.get_cropped_img(frame, res)
+            cropped_frame = self._pil_to_cv_img(cropped_frame)
+
+            file_name = os.path.join(outdir, f'{i}.png')
+            cv2.imwrite(file_name, cropped_frame)
+            i += 1
+        
+        cap.release()
+        cv2.destroyAllWindows()
 
     # def _drop_features(self, arr, drop_features):
     #     remaining_features = list(self.landmarks_dict.keys())
@@ -289,8 +322,21 @@ class FacialLandmarksExtractor:
 
 
 if __name__ == "__main__":
-    path1 = "look_img(26).png"
-    # path2 = "2.jpg"
+    import argparse
 
-    FLE = FacialLandmarksExtractor(device='cpu')
-    FLE.save_cropped_img(path1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--func", help="crop_folder|crop_img")
+    parser.add_argument("--video_path", help="display a square of a given number")
+    parser.add_argument("--outdir", help="display a square of a given number")
+    parser.add_argument("--res", type=int, default=512, help="display a square of a given number")
+    parser.add_argument("--device", default='cuda', help='cpu|cuda')
+
+    args = parser.parse_args()
+
+    if args.func == 'crop_folder':
+        FLE = FacialLandmarksExtractor(device=args.device)
+        FLE.crop_folder(args.video_path, args.res, args.outdir)
+    elif args.func == 'crop_img':
+        raise NotImplementedError('Crop image functionality not implemented yet.')
+    else:
+        raise ValueError('func has to be crop_folder or crop_img')
