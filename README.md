@@ -4,7 +4,7 @@
 
 ## StyleGAN2 Facial Landmark Projection
 
-This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is from the original StyleGAN2 repository [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes (noise regularization omitted):
+This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is an adaptation from the original [StyleGAN2-ADA repository](https://github.com/NVlabs/stylegan2-ada-pytorch) [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes (noise regularization omitted):
 
 <img src="https://render.githubusercontent.com/render/math?math=\large loss = \lambda_{lpips} LPIPS(x_{projection}, x_{target\_look}) %2B HL(x_{projection}, x_{target\_landmark})">, 
 
