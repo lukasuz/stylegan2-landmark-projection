@@ -200,9 +200,7 @@ def project(
 
     # a =  w_out.repeat([1, G.mapping.num_ws, 1])
 
-    w_opt_expanded = w_opt.clone().detach().repeat([1, G.mapping.num_ws, 1])
-
-    return w_opt_expanded, w_std, noise_bufs, vgg16, target_features, optimizer, synth_images
+    return w_opt, w_std, noise_bufs, vgg16, target_features, optimizer, synth_images
 
 # ----------------------------------------------------------------------------
 
@@ -332,14 +330,15 @@ def run_projection(
         # target_pil_look.save(f'{outdir}/target_look.png')
         # target_pil_landmarks.save(f'{outdir}/target_landmarks.png')
         # projected_w = projected_w_steps[-1]
-        synth_image = G.synthesis(w_opt, noise_mode='const', force_fp32=True)
+        w_opt_expanded = w_opt.clone().detach().repeat([1, G.mapping.num_ws, 1])
+        synth_image = G.synthesis(w_opt_expanded, noise_mode='const', force_fp32=True)
         # print(i,f'{outdir}/proj_{0}.png'.format(i))
         synth_image = (synth_image + 1) * (255/2)
         synth_image = synth_image.permute(0, 2, 3, 1).clamp(
             0, 255).to(torch.uint8)[0].cpu().numpy()
         PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj_{i}.png')
         np.savez(f'{outdir}/projected_{i}.npz',
-                w=w_opt.cpu().numpy())
+                w=w_opt_expanded.cpu().numpy())
 
     # Render debug output: optional video and projected image and W vector.
     # if save_video:
