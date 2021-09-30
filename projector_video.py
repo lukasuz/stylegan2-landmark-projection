@@ -332,7 +332,7 @@ def run_projection(
         # target_pil_look.save(f'{outdir}/target_look.png')
         # target_pil_landmarks.save(f'{outdir}/target_landmarks.png')
         # projected_w = projected_w_steps[-1]
-        synth_image = G.synthesis(w_opt, noise_mode='const')
+        synth_image = G.synthesis(w_opt, noise_mode='const', force_fp32=True)
         # print(i,f'{outdir}/proj_{0}.png'.format(i))
         synth_image = (synth_image + 1) * (255/2)
         synth_image = synth_image.permute(0, 2, 3, 1).clamp(
