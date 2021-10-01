@@ -52,6 +52,7 @@ def project(
     discriminator_weight=0.1,
     fidelity_weight=0.1,
     lpips_weight=1.0,
+    smoothness_weight=0.1,
     verbose=False,
     device: torch.device,
     w_opt=None,
@@ -167,7 +168,10 @@ def project(
             loss_G = torch.tensor(0)
 
         # Data fidelity
-        fidelity_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
+        fidelity_loss = torch.sum(torch.sqrt((w_avg_tensor - w_opt)**2 + 1e-6))
+
+        # Neighbour smoothness
+        smoothness_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255/2)
@@ -203,13 +207,14 @@ def project(
                reg_loss * regularize_noise_weight + \
                landmark_loss * landmark_weight + \
                loss_G * discriminator_weight + \
-               fidelity_loss * fidelity_weight
+               fidelity_loss * fidelity_weight + \
+               smoothness_loss * smoothness_weight
 
         # Step
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        logprint(f'  step {step+1:>4d}/{num_steps}: lpips dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} fidelity_loss {fidelity_loss * fidelity_weight:<4.2f} generator_loss {loss_G * discriminator_weight:<4.2f} loss {float(loss):<5.2f}')
+        logprint(f'  step {step+1:>4d}/{num_steps}: lpips dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} fidelity_loss {fidelity_loss * fidelity_weight:<4.2f} smoothness loss {smoothness_loss * smoothness_weight:<4.2f} generator_loss {loss_G * discriminator_weight:<4.2f} loss {float(loss):<5.2f}')
 
         # Save projected W for each optimization step.
         # w_out[step] = w_opt.detach()[0]
@@ -243,7 +248,8 @@ def project(
 # @click.option('--save_video',             help='0|1', required=True, default=0, show_default=True)
 @click.option('--device',                 help='cpu|cuda', required=True, default='cuda', show_default=True)
 @click.option('--d_weight',               help='Whether discriminator loss shall be used', type=float, default=0, show_default=True)
-@click.option('--fidelity_weight',        help='Face fidelity weight', default=0.01, type=float, show_default=True)
+@click.option('--fidelity_weight',        help='Face fidelity weight', default=0.05, type=float, show_default=True)
+@click.option('--smoothness_weight',      help='Smoothness inbetween frames', type=float, default=0.05, show_default=True)
 @click.option('--landmark_weights',       help='land mark weights: jaw, left_eyebrow, right_eyebrow, nose_bridge, lower_nose, left_eye, right_eye, outer_lip, inner_lip', type=str, default='0.05, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0, 5.0, 5.0', show_default=True)
 def run_projection(
     network_pkl: str,
@@ -259,7 +265,8 @@ def run_projection(
     device: str,
     landmark_weights: str,
     d_weight: float,
-    fidelity_weight:float
+    fidelity_weight:float,
+    smoothness_weight:float
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -353,7 +360,8 @@ def run_projection(
             target_features=target_features,
             optimizer=optimizer,
             discriminator_weight=d_weight,
-            fidelity_weight=fidelity_weight
+            fidelity_weight=fidelity_weight,
+            smoothness_weight=smoothness_weight
         )
 
         # w_opt_save = w_opt.clone().detach()
