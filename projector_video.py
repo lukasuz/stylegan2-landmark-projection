@@ -50,11 +50,13 @@ def project(
     regularize_noise_weight=1e5,
     landmark_weight=0.01,
     discriminator_weight=0.1,
+    fidelity_weight=0.1,
     lpips_weight=1.0,
     verbose=False,
     device: torch.device,
     w_opt=None,
     w_std=None,
+    w_avg_tensor,
     noise_bufs=None,
     vgg16=None,
     target_features=None,
@@ -70,9 +72,9 @@ def project(
         False).to(device)  # type: ignore
 
     # TODO: discriminator loss
-
-    D = copy.deepcopy(D).eval().requires_grad_(
-        False).to(device)  # type: ignore
+    if D:
+        D = copy.deepcopy(D).eval().requires_grad_(
+            False).to(device)  # type: ignore
 
     # Compute w stats.
     if w_opt is None:
@@ -85,6 +87,7 @@ def project(
             np.float32)       # [N, 1, C]
         w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
         w_std = (np.sum((w_samples - w_avg) ** 2) / w_avg_samples) ** 0.5
+        w_avg_tensor = torch.tensor(w_avg, dtype=torch.float32, device=device)
 
         w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device,
                             requires_grad=True)  # pylint: disable=not-callable
@@ -99,20 +102,21 @@ def project(
             buf[:] = torch.randn_like(buf)
             buf.requires_grad = True
 
-    # Load VGG16 feature detector.
-    if vgg16 is None:
-        url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
-        with dnnlib.util.open_url(url) as f:
-            vgg16 = torch.jit.load(f).eval().to(device)
+    if lpips_weight > 0:
+        # Load VGG16 feature detector.
+        if vgg16 is None:
+            url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
+            with dnnlib.util.open_url(url) as f:
+                vgg16 = torch.jit.load(f).eval().to(device)
 
-    # Features for target image.
-    if target_features is None:
-        target_images = target.unsqueeze(0).to(device).to(torch.float32)
-        if target_images.shape[2] > 256:
-            target_images = F.interpolate(
-                target_images, size=(256, 256), mode='area')
-        target_features = vgg16(
-            target_images, resize_images=False, return_lpips=True)
+        # Features for target image.
+        if target_features is None:
+            target_images = target.unsqueeze(0).to(device).to(torch.float32)
+            if target_images.shape[2] > 256:
+                target_images = F.interpolate(
+                    target_images, size=(256, 256), mode='area')
+            target_features = vgg16(
+                target_images, resize_images=False, return_lpips=True)
 
     # w_out = torch.zeros([num_steps] + list(w_opt.shape[1:]),
     #                     dtype=torch.float32, device=device)
@@ -153,14 +157,15 @@ def project(
         ws = (w_opt + w_noise).repeat([1, G.mapping.num_ws, 1])
         synth_images = G.synthesis(ws, noise_mode='const', force_fp32=True)
 
-        # Downsample image to 512x512 for discriminator
-        # # synth_images_D = syn
-        # if synth_images.shape[-1] != 512:
-        #     synth_images_D = F.interpolate(synth_images_D, size=(512, 512), mode='area') 
+        if D:
+            # Discriminator loss
+            gen_logits = D(synth_images, D.c_dim, force_fp32=True)
+            loss_G = torch.nn.functional.softplus(-gen_logits).squeeze().squeeze()
+        else:
+            loss_G = torch.tensor(0)
 
-        # g_loss = torch.nn.functional.softplus(synth_images)
-        gen_logits = D(synth_images, D.c_dim, force_fp32=True)
-        loss_G = torch.nn.functional.softplus(-gen_logits).squeeze().squeeze()
+        # Data fidelity
+        fidelity_loss = torch.sum(torch.sqrt((w_avg_tensor - w_opt)**2 + 1e-6))
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255/2)
@@ -168,10 +173,13 @@ def project(
             synth_images = F.interpolate(
                 synth_images, size=(256, 256), mode='area')
 
-        # Features for synth images.
-        synth_features = vgg16(
-            synth_images, resize_images=False, return_lpips=True)
-        dist = (target_features - synth_features).square().sum()
+        if lpips_weight > 0:
+            # Features for synth images.
+            synth_features = vgg16(
+                synth_images, resize_images=False, return_lpips=True)
+            dist = (target_features - synth_features).square().sum()
+        else:
+            dist = torch.tensor(0)
 
         synth_heatmaps = FLE.get_heat_map(synth_images)
         landmark_loss = (target_heatmap - synth_heatmaps) * weight_matrix
@@ -192,13 +200,14 @@ def project(
         loss = lpips_weight * dist + \
                reg_loss * regularize_noise_weight + \
                landmark_loss * landmark_weight + \
-               loss_G * discriminator_weight
+               loss_G * discriminator_weight + \
+               fidelity_loss * fidelity_weight
 
         # Step
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        logprint(f'  step {step+1:>4d}/{num_steps}: lpips dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} generator_loss {loss_G * discriminator_weight:<4.2f} loss {float(loss):<5.2f}')
+        logprint(f'  step {step+1:>4d}/{num_steps}: lpips dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} fidelity_loss {fidelity_loss * fidelity_weight:<4.2f} generator_loss {loss_G * discriminator_weight:<4.2f} loss {float(loss):<5.2f}')
 
         # Save projected W for each optimization step.
         # w_out[step] = w_opt.detach()[0]
@@ -213,7 +222,7 @@ def project(
 
     # a =  w_out.repeat([1, G.mapping.num_ws, 1])
 
-    return w_opt, w_std, noise_bufs, vgg16, target_features, optimizer, synth_images
+    return w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, optimizer, synth_images
 
 # ----------------------------------------------------------------------------
 
@@ -231,7 +240,8 @@ def project(
 @click.option('--outdir',                 help='Where to save the output images', required=True, metavar='DIR')
 # @click.option('--save_video',             help='0|1', required=True, default=0, show_default=True)
 @click.option('--device',                 help='cpu|cuda', required=True, default='cuda', show_default=True)
-@click.option('--d_weight',                 help='Whether discriminator loss shall be used', type=float, default=False, show_default=True)
+@click.option('--d_weight',               help='Whether discriminator loss shall be used', type=float, default=0, show_default=True)
+@click.option('--fidelity_weight',        help='Face fidelity weight', default=0.01, type=float, show_default=True)
 @click.option('--landmark_weights',       help='land mark weights: jaw, left_eyebrow, right_eyebrow, nose_bridge, lower_nose, left_eye, right_eye, outer_lip, inner_lip', type=str, default='0.05, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0, 5.0, 5.0', show_default=True)
 def run_projection(
     network_pkl: str,
@@ -246,7 +256,8 @@ def run_projection(
     lpips_weight: float,
     device: str,
     landmark_weights: str,
-    d_weight: float
+    d_weight: float,
+    fidelity_weight:float
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -294,7 +305,7 @@ def run_projection(
     file_names.sort(key=natural_sort_key)
 
     os.makedirs(outdir, exist_ok=True)
-    w_opt, w_std, noise_bufs, vgg16, target_features, optimizer = [None] * 6
+    w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, optimizer = [None] * 7
     for i in tqdm(range(len(file_names))):
         target_landmarks = os.path.join(target_landmarks_folder, file_names[i])
 
@@ -319,7 +330,7 @@ def run_projection(
 
         # Optimize projection.
         start_time = perf_counter()
-        w_opt, w_std, noise_bufs, vgg16, target_features, optimizer, synth_image = project(
+        w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, optimizer, synth_image = project(
             G,
             D,
             FLE,
@@ -334,11 +345,13 @@ def run_projection(
             verbose=True, 
             w_opt=w_opt,
             w_std=w_std,
+            w_avg_tensor=w_avg_tensor,
             noise_bufs=noise_bufs,
             vgg16=vgg16,
             target_features=target_features,
             optimizer=optimizer,
-            discriminator_weight=d_weight
+            discriminator_weight=d_weight,
+            fidelity_weight=fidelity_weight
         )
 
         # w_opt_save = w_opt.clone().detach()
