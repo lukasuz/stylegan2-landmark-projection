@@ -49,6 +49,7 @@ def project(
     noise_ramp_length=0.75,
     regularize_noise_weight=1e5,
     landmark_weight=0.01,
+    discriminator_weight=0.1,
     lpips_weight=1.0,
     verbose=False,
     device: torch.device,
@@ -69,8 +70,9 @@ def project(
         False).to(device)  # type: ignore
 
     # TODO: discriminator loss
-    # D = copy.deepcopy(D).eval().requires_grad_(
-    #     False).to(device)  # type: ignore
+
+    D = copy.deepcopy(D).eval().requires_grad_(
+        False).to(device)  # type: ignore
 
     # Compute w stats.
     if w_opt is None:
@@ -151,6 +153,15 @@ def project(
         ws = (w_opt + w_noise).repeat([1, G.mapping.num_ws, 1])
         synth_images = G.synthesis(ws, noise_mode='const', force_fp32=True)
 
+        # Downsample image to 512x512 for discriminator
+        # # synth_images_D = syn
+        # if synth_images.shape[-1] != 512:
+        #     synth_images_D = F.interpolate(synth_images_D, size=(512, 512), mode='area') 
+
+        # g_loss = torch.nn.functional.softplus(synth_images)
+        gen_logits = D(synth_images, D.c_dim, force_fp32=True)
+        loss_G = torch.nn.functional.softplus(-gen_logits).squeeze().squeeze()
+
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255/2)
         if synth_images.shape[2] > 256:
@@ -178,14 +189,16 @@ def project(
                 if noise.shape[2] <= 8:
                     break
                 noise = F.avg_pool2d(noise, kernel_size=2)
-        loss = lpips_weight * dist + reg_loss * \
-            regularize_noise_weight + landmark_loss * landmark_weight
+        loss = lpips_weight * dist + \
+               reg_loss * regularize_noise_weight + \
+               landmark_loss * landmark_weight + \
+               loss_G * discriminator_weight
 
         # Step
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        logprint(f'  step {step+1:>4d}/{num_steps}: dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} loss {float(loss):<5.2f}')
+        logprint(f'  step {step+1:>4d}/{num_steps}: lpips dist {lpips_weight * dist:<4.2f} landmark_dist {landmark_loss * landmark_weight:<4.2f} generator_loss {loss_G * discriminator_weight:<4.2f} loss {float(loss):<5.2f}')
 
         # Save projected W for each optimization step.
         # w_out[step] = w_opt.detach()[0]
@@ -218,7 +231,7 @@ def project(
 @click.option('--outdir',                 help='Where to save the output images', required=True, metavar='DIR')
 # @click.option('--save_video',             help='0|1', required=True, default=0, show_default=True)
 @click.option('--device',                 help='cpu|cuda', required=True, default='cuda', show_default=True)
-@click.option('--d_loss',                 help='Whether discriminator loss shall be used', type=bool, default=False, show_default=True)
+@click.option('--d_weight',                 help='Whether discriminator loss shall be used', type=float, default=False, show_default=True)
 @click.option('--landmark_weights',       help='land mark weights: jaw, left_eyebrow, right_eyebrow, nose_bridge, lower_nose, left_eye, right_eye, outer_lip, inner_lip', type=str, default='0.05, 1.0, 1.0, 0.1, 1.0, 1.0, 1.0, 5.0, 5.0', show_default=True)
 def run_projection(
     network_pkl: str,
@@ -233,7 +246,7 @@ def run_projection(
     lpips_weight: float,
     device: str,
     landmark_weights: str,
-    d_loss: bool
+    d_weight: float
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -254,15 +267,16 @@ def run_projection(
 
     device = torch.device(device)
     with dnnlib.util.open_url(network_pkl) as fp:
-        G = legacy.load_network_pkl(fp)['G_ema'].requires_grad_(
+        data = legacy.load_network_pkl(fp)
+        G = data['G_ema'].requires_grad_(
             False).to(device)  # type: ignore
         G = G.float()
 
         D = None
-        if d_loss:
-            D = legacy.load_network_pkl(fp)['D'].requires_grad_(
+        if d_weight > 0:
+            D = data['D'].requires_grad_(
                 False).to(device)  # type: ignore
-            D = G.float()
+            D = D.float()
 
     # Load target look image.
     target_pil_look = PIL.Image.open(target_look).convert('RGB')
@@ -323,7 +337,8 @@ def run_projection(
             noise_bufs=noise_bufs,
             vgg16=vgg16,
             target_features=target_features,
-            optimizer=optimizer
+            optimizer=optimizer,
+            discriminator_weight=d_weight
         )
 
         # w_opt_save = w_opt.clone().detach()
