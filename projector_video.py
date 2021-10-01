@@ -92,6 +92,8 @@ def project(
         w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device,
                             requires_grad=True)  # pylint: disable=not-callable
 
+    w_opt_prev = w_opt.clone().detach()
+
     # Setup noise inputs.
     if noise_bufs is None:
         noise_bufs = {name: buf for (
@@ -165,7 +167,7 @@ def project(
             loss_G = torch.tensor(0)
 
         # Data fidelity
-        fidelity_loss = torch.sum(torch.sqrt((w_avg_tensor - w_opt)**2 + 1e-6))
+        fidelity_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255/2)
