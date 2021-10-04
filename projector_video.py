@@ -32,6 +32,16 @@ def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(_nsre, s)]   
 
+def get_vgg_features(target, device, vgg16):
+    if len(target.shape) < 4:
+        target = target.unsqueeze(0)
+    target_images = target.to(device).to(torch.float32)
+    if target_images.shape[2] > 256:
+        target_images = F.interpolate(
+            target_images, size=(256, 256), mode='area')
+    target_features = vgg16(target_images, resize_images=False, return_lpips=True)
+    return target_features
+
 def project(
     G,
     D, 
@@ -94,6 +104,24 @@ def project(
                             requires_grad=True)  # pylint: disable=not-callable
 
     w_opt_prev = w_opt.clone().detach()
+    w_opt_prev_expanded = w_opt_prev.repeat([1, G.mapping.num_ws, 1])
+
+    prev_img = G.synthesis(w_opt_prev_expanded, noise_mode='const', force_fp32=True)
+
+    if lpips_weight > 0 or smoothness_weight > 0:
+        # Load VGG16 feature detector.
+        if vgg16 is None:
+            url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
+            with dnnlib.util.open_url(url) as f:
+                vgg16 = torch.jit.load(f).eval().to(device)
+
+        # Features for target image.
+        if target_features is None:
+            target_features = get_vgg_features(target, device, vgg16)
+
+    if smoothness_weight > 0:
+        prev_features = get_vgg_features(prev_img, device, vgg16)
+
 
     # Setup noise inputs.
     if noise_bufs is None:
@@ -105,21 +133,7 @@ def project(
             buf[:] = torch.randn_like(buf)
             buf.requires_grad = True
 
-    if lpips_weight > 0:
-        # Load VGG16 feature detector.
-        if vgg16 is None:
-            url = 'https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada-pytorch/pretrained/metrics/vgg16.pt'
-            with dnnlib.util.open_url(url) as f:
-                vgg16 = torch.jit.load(f).eval().to(device)
 
-        # Features for target image.
-        if target_features is None:
-            target_images = target.unsqueeze(0).to(device).to(torch.float32)
-            if target_images.shape[2] > 256:
-                target_images = F.interpolate(
-                    target_images, size=(256, 256), mode='area')
-            target_features = vgg16(
-                target_images, resize_images=False, return_lpips=True)
 
     # w_out = torch.zeros([num_steps] + list(w_opt.shape[1:]),
     #                     dtype=torch.float32, device=device)
@@ -169,20 +183,16 @@ def project(
 
         # Data fidelity
         fidelity_loss = torch.sum(torch.sqrt((w_avg_tensor - w_opt)**2 + 1e-6))
+        
+        # Generate images
+        synth_images = (synth_images + 1) * (255/2)
+        synth_features = get_vgg_features(synth_images, device, vgg16)
 
         # Neighbour smoothness
-        smoothness_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
-
-        # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
-        synth_images = (synth_images + 1) * (255/2)
-        if synth_images.shape[2] > 256:
-            synth_images = F.interpolate(
-                synth_images, size=(256, 256), mode='area')
+        smoothness_loss = (synth_features - prev_features).square().sum()
 
         if lpips_weight > 0:
             # Features for synth images.
-            synth_features = vgg16(
-                synth_images, resize_images=False, return_lpips=True)
             dist = (target_features - synth_features).square().sum()
         else:
             dist = torch.tensor(0)
