@@ -71,7 +71,8 @@ def project(
     noise_bufs=None,
     vgg16=None,
     target_features=None,
-    optimizer=None
+    optimizer=None,
+    first_iter=True
 ):
     assert target.shape == (G.img_channels, G.img_resolution, G.img_resolution)
 
@@ -189,7 +190,10 @@ def project(
         synth_features = get_vgg_features(synth_images, device, vgg16)
 
         # Neighbour smoothness
-        smoothness_loss = (synth_features - prev_features).square().sum()
+        if first_iter:
+            smoothness_loss = 0
+        else:
+            smoothness_loss = (synth_features - prev_features).square().sum()
 
         if lpips_weight > 0:
             # Features for synth images.
@@ -371,7 +375,8 @@ def run_projection(
             optimizer=optimizer,
             discriminator_weight=d_weight,
             fidelity_weight=fidelity_weight,
-            smoothness_weight=smoothness_weight
+            smoothness_weight=smoothness_weight,
+            first_iter=i==0
         )
 
         # w_opt_save = w_opt.clone().detach()
