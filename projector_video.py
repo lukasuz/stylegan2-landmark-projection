@@ -105,9 +105,9 @@ def project(
                             requires_grad=True)  # pylint: disable=not-callable
 
     w_opt_prev = w_opt.clone().detach()
-    w_opt_prev_expanded = w_opt_prev.repeat([1, G.mapping.num_ws, 1])
+    # w_opt_prev_expanded = w_opt_prev.repeat([1, G.mapping.num_ws, 1])
 
-    prev_img = G.synthesis(w_opt_prev_expanded, noise_mode='const', force_fp32=True)
+    # prev_img = G.synthesis(w_opt_prev_expanded, noise_mode='const', force_fp32=True)
 
     if lpips_weight > 0 or smoothness_weight > 0:
         # Load VGG16 feature detector.
@@ -120,8 +120,8 @@ def project(
         if target_features is None:
             target_features = get_vgg_features(target, device, vgg16)
 
-    if smoothness_weight > 0:
-        prev_features = get_vgg_features(prev_img, device, vgg16)
+    # if smoothness_weight > 0:device
+    #     prev_features = get_vgg_features(prev_img, , vgg16)
 
 
     # Setup noise inputs.
@@ -193,7 +193,8 @@ def project(
         if first_iter:
             smoothness_loss = 0
         else:
-            smoothness_loss = (synth_features - prev_features).square().sum()
+            # smoothness_loss = (synth_features - prev_features).square().sum()
+            smoothness_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
 
         if lpips_weight > 0:
             # Features for synth images.
@@ -383,15 +384,29 @@ def run_projection(
         # target_pil_look.save(f'{outdir}/target_look.png')
         # target_pil_landmarks.save(f'{outdir}/target_landmarks.png')
         # projected_w = projected_w_steps[-1]
+
         w_opt_expanded = w_opt.clone().detach().repeat([1, G.mapping.num_ws, 1])
-        synth_image = G.synthesis(w_opt_expanded, noise_mode='const', force_fp32=True)
-        # print(i,f'{outdir}/proj_{0}.png'.format(i))
-        synth_image = (synth_image + 1) * (255/2)
-        synth_image = synth_image.permute(0, 2, 3, 1).clamp(
-            0, 255).to(torch.uint8)[0].cpu().numpy()
-        PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj_{i}.png')
-        np.savez(f'{outdir}/projected_{i}.npz',
-                w=w_opt_expanded.cpu().numpy())
+
+        for j in range(2):
+            if j == 0:
+                if i == 0: # No interpolation for first image possible
+                    continue
+                interpolated_w = (w_opt_expanded + w_opt_prev_expanded) / 2
+                synth_image = G.synthesis(interpolated_w, noise_mode='const', force_fp32=True)
+                
+            elif j == 1:
+                synth_image = G.synthesis(w_opt_expanded, noise_mode='const', force_fp32=True)
+            
+            
+            # print(i,f'{outdir}/proj_{0}.png'.format(i))
+            synth_image = (synth_image + 1) * (255/2)
+            synth_image = synth_image.permute(0, 2, 3, 1).clamp(
+                0, 255).to(torch.uint8)[0].cpu().numpy()
+            PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj_{i}_{j}.png')
+            np.savez(f'{outdir}/projected_{i}_{j}.npz',
+                    w=w_opt_expanded.cpu().numpy())
+        
+        w_opt_prev_expanded = w_opt_expanded
 
     # Render debug output: optional video and projected image and W vector.
     # if save_video:
