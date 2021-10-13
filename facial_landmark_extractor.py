@@ -7,6 +7,7 @@ import torch
 import PIL.Image
 import scipy.ndimage
 import os
+from tqdm import tqdm
 
 from torch._C import Value
 
@@ -239,6 +240,7 @@ class FacialLandmarksExtractor:
         os.makedirs(outdir, exist_ok=True)
         cap = cv2.VideoCapture(video_path)
         i = 0
+        print("Cropping images")
         while(cap.isOpened()):
             ret, frame = cap.read()
             if ret == False:
@@ -250,6 +252,7 @@ class FacialLandmarksExtractor:
             file_name = os.path.join(outdir, f'{i}.png')
             cv2.imwrite(file_name, cropped_frame)
             i += 1
+            print("  {0} images cropped.".format(i))
         
         cap.release()
         cv2.destroyAllWindows()
