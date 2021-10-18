@@ -135,10 +135,20 @@ class FacialLandmarksExtractor:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    def get_cropped_img(self, path_or_img, output_size=512, transform_size=4096, enable_padding=True):
+    def get_cropped_img(self, path_or_img, output_size=512, transform_size=4096, enable_padding=True, processing_size=256):
         """ Face alignment crop from https://gist.github.com/lzhbrian/bde87ab23b499dd02ba4f588258f57d5
         """
         cv_img = self.safely_read(path_or_img) # face_alignment has a problem with png images
+
+        max_dim_size = np.max(cv_img.shape)
+        scale_factor = processing_size / max_dim_size
+
+        width = int(cv_img.shape[1] * scale_factor)
+        height = int(cv_img.shape[0] * scale_factor)
+        
+        # resize image
+        cv_img = cv2.resize(cv_img, (width, height), interpolation = cv2.INTER_AREA)
+
         lms = self.fa.get_landmarks_from_image(cv_img)
         if len(lms) == 0:
             warnings.warn("No face detected.")
@@ -147,6 +157,7 @@ class FacialLandmarksExtractor:
             warnings.warn("Multiple faces detected, choosing first one.")
 
         lm = lms[0]
+        self.display_landmarks_img(cv_img, lm)
 
         lm_eye_left      = lm[36 : 42]  # left-clockwise
         lm_eye_right     = lm[42 : 48]  # left-clockwise
