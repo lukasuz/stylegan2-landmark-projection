@@ -1,5 +1,7 @@
 <img src="./examples/focus_mouth.png" width="1000"/>
 
+**You can also generate face animations now. Check this [blog post](https://lukas.uzolas.com/blog/2021/animation/) to find out how.**
+
 [Google Colab](https://colab.research.google.com/drive/189Yc3zBvuGKdxyS_vOD5q6slqVu1qWR_?usp=sharing)
 
 ## StyleGAN2 Facial Landmark Projection
