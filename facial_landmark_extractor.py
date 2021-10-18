@@ -157,7 +157,6 @@ class FacialLandmarksExtractor:
             warnings.warn("Multiple faces detected, choosing first one.")
 
         lm = lms[0]
-        self.display_landmarks_img(cv_img, lm)
 
         lm_eye_left      = lm[36 : 42]  # left-clockwise
         lm_eye_right     = lm[42 : 48]  # left-clockwise
