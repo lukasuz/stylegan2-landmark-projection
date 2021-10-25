@@ -119,7 +119,7 @@ def project(
     weight_matrix = torch.repeat_interleave(weight_matrix, repeats=64, dim=2)
     weight_matrix = torch.repeat_interleave(weight_matrix, repeats=64, dim=3)
 
-    for step in range(num_steps):
+    for step in tqdm(range(num_steps)):
         # Learning rate schedule.
         t = step / num_steps
         w_noise_scale = w_std * initial_noise_factor * \
@@ -186,8 +186,7 @@ def project(
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        logprint(f'  step {step+1:>4d}/{num_steps}: ' + \
-            f'lpips loss {nf * lpips_weight * dist:<4.2f} ' + \
+        tqdm.write(f'lpips loss {nf * lpips_weight * dist:<4.2f} ' + \
             f'landmark loss {nf * landmark_loss * landmark_weight:<4.2f} ' + \
             f'smoothness loss {nf * smoothness_loss * smoothness_weight:<4.2f} ' + \
             f'fidelity loss {nf * fidelity_loss * fidelity_weight:<4.2f} ' + \
@@ -280,7 +279,9 @@ def run_projection(
         for i in range(len(file_names)):
             target_landmarks = os.path.join(target_landmarks_folder, file_names[i])
             target_landmarks_uint8 = load_image(target_landmarks, (G.img_resolution, G.img_resolution))
-            target_heatmaps[i,...] = FLE.get_heat_map(target_landmarks_uint8).to(device).to(torch.float32)
+            heatmap = FLE.get_heat_map(target_landmarks_uint8).to(torch.float32)
+            print(target_heatmaps.shape, heatmap.shape)
+            target_heatmaps[i,...] = heatmap
     
     # Optimize projection.
     start_time = perf_counter()
