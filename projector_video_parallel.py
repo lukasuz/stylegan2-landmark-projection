@@ -279,8 +279,8 @@ def run_projection(
         for i in range(len(file_names)):
             target_landmarks = os.path.join(target_landmarks_folder, file_names[i])
             target_landmarks_uint8 = load_image(target_landmarks, (G.img_resolution, G.img_resolution))
+            print(target_heatmaps.shape, target_landmarks_uint8.shape)
             heatmap = FLE.get_heat_map(target_landmarks_uint8).to(torch.float32)
-            print(target_heatmaps.shape, heatmap.shape)
             target_heatmaps[i,...] = heatmap
     
     # Optimize projection.
