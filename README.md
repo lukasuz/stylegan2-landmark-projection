@@ -1,10 +1,12 @@
 <img src="./examples/focus_mouth.png" width="1000"/>
 
+**You can also generate face animations now. Check this [blog post](https://lukas.uzolas.com/blog/2021/animation/) to find out how.**
+
 [Google Colab](https://colab.research.google.com/drive/189Yc3zBvuGKdxyS_vOD5q6slqVu1qWR_?usp=sharing)
 
 ## StyleGAN2 Facial Landmark Projection
 
-This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is from the original StyleGAN2 repository [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes (noise regularization omitted):
+This is an experimental repository with the aim to project facial landmark into the StyleGAN2 latent space. The code is an adaptation from the original [StyleGAN2-ADA repository](https://github.com/NVlabs/stylegan2-ada-pytorch) [0]. For projection of facial landmarks, the l2 norm of the landmark heat maps between projection image and target landmark image is minimized, next to the original LPIPS loss [2]. For heat maps of the landmarks, [1] is used. Thus, there are two target images, one for the *look* and one for the *landmarks*. The objective becomes (noise regularization omitted):
 
 <img src="https://render.githubusercontent.com/render/math?math=\large loss = \lambda_{lpips} LPIPS(x_{projection}, x_{target\_look}) %2B HL(x_{projection}, x_{target\_landmark})">, 
 
@@ -51,7 +53,7 @@ Images from [FFHQ](https://github.com/NVlabs/ffhq-dataset) data set.
 - ~~Allow for different landmark weights via command line. This will probably improve the above example.~~
 - ~~Check out why the style look of the facial expression image leaks into the projection. Apparently the heat maps contain some "style" signal~~ (normalization factor in heat map calculation was the culprit, seems to work quite well now. This also improved quality of generated images immensely)
 - ~~Add face cropping as preprocessing for non ffhq images~~
-- Face cropping does not match completly ffhq preprocessing, also uniform background are degrading results strongly. Improve face cropping.
+- ~~Face cropping does not match completly ffhq preprocessing, also uniform background are degrading results strongly. Improve face cropping.~~
 - Add discriminator loss / regularization. Heat maps are some times wrongly extracted resulting in a **very** wrongly propagated error
 - Attempt to remove landmark information from VGG embedding for lpips calculation.
 
