@@ -278,8 +278,8 @@ def run_projection(
         target_heatmaps = torch.zeros([len(file_names), 68, 64, 64], device=device, dtype=torch.float32) # no. img x landmarks x X x Y
         for i in range(len(file_names)):
             target_landmarks = os.path.join(target_landmarks_folder, file_names[i])
-            target_landmarks_uint8 = load_image(target_landmarks, (G.img_resolution, G.img_resolution))
-            print(target_heatmaps.shape, target_landmarks_uint8.shape)
+            target_landmarks_uint8 = load_image(target_landmarks, (G.img_resolution, G.img_resolution)).unsqueeze()
+            # print(target_heatmaps.shape, target_landmarks_uint8.shape)
             heatmap = FLE.get_heat_map(target_landmarks_uint8).to(torch.float32)
             target_heatmaps[i,...] = heatmap
     
