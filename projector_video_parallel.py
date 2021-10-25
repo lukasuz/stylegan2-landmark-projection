@@ -17,6 +17,7 @@ import click
 import imageio
 import numpy as np
 import PIL.Image
+from numpy.lib.shape_base import expand_dims
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -144,6 +145,9 @@ def project(
         
         # Generate images
         synth_images = (synth_images + 1) * (255/2)
+        if synth_images.shape[2] > 256:
+            synth_images = F.interpolate(
+                synth_images, size=(256, 256), mode='area')
 
         # smoothness_loss = torch.sum(torch.sqrt((w_opt_prev - w_opt)**2 + 1e-6))
         if smoothness_weight > 0:
@@ -277,10 +281,11 @@ def run_projection(
     with torch.no_grad():
         target_heatmaps = torch.zeros([len(file_names), 68, 64, 64], device=device, dtype=torch.float32) # no. img x landmarks x X x Y
         for i in range(len(file_names)):
-            target_landmarks = os.path.join(target_landmarks_folder, file_names[i])
-            target_landmarks_uint8 = load_image(target_landmarks, (G.img_resolution, G.img_resolution)).unsqueeze()
+            target_landmarks_path = os.path.join(target_landmarks_folder, file_names[i])
+            target_landmarks_inp = torch.tensor(load_image(target_landmarks_path, (256, 256)))
+            target_landmarks_inp = target_landmarks_inp.unsqueeze(0).to(device).to(torch.float32)
             # print(target_heatmaps.shape, target_landmarks_uint8.shape)
-            heatmap = FLE.get_heat_map(target_landmarks_uint8).to(torch.float32)
+            heatmap = FLE.get_heat_map(target_landmarks_inp).to(torch.float32)
             target_heatmaps[i,...] = heatmap
     
     # Optimize projection.
