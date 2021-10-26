@@ -202,7 +202,7 @@ def project(
                 buf -= buf.mean()
                 buf *= buf.square().mean().rsqrt()
 
-    return w_opts, synth_images
+    return w_opts, synth_images, noise_bufs
 
 # ----------------------------------------------------------------------------
 
@@ -290,7 +290,7 @@ def run_projection(
     
     # Optimize projection.
     start_time = perf_counter()
-    w_opts, synth_images = project(
+    w_opts, synth_images, noise_bufs = project(
         G,
         FLE,
         target=torch.tensor(target_look_uint8.transpose(
@@ -319,20 +319,20 @@ def run_projection(
             if j == 0:
                 if i == 0: # No interpolation for first image possible
                     continue
-                interpolated_w = ((w_opts[i] + w_opts[i-1]) / 2).unsqueeze(0)
-                synth_image = G.synthesis(interpolated_w, noise_mode='const', force_fp32=True)
-                synth_image = (synth_image + 1) * (255/2)
+                w = ((w_opts[i] + w_opts[i-1]) / 2).unsqueeze(0)
                 
             elif j == 1:
                 # synth_image = G.synthesis(w_opts[i], noise_mode='const', force_fp32=True)
-                synth_image = synth_images[i].unsqueeze(0)
-            
-            
+                w = w_opts[i].unsqueeze(0)
+
+            synth_image = G.synthesis(w, noise_mode='const', force_fp32=True)
+            synth_image = (synth_image + 1) * (255/2)
             synth_image = synth_image.permute(0, 2, 3, 1).clamp(
                 0, 255).to(torch.uint8)[0].cpu().numpy()
             PIL.Image.fromarray(synth_image, 'RGB').save(f'{outdir}/proj_{i}_{j}.png')
 
     np.savez(f'{outdir}/w_opts.npz', w=w_opts.cpu().numpy())
+    # np.savez(f'{outdir}/noise_bufs.npz', w=noise_bufs.cpu().numpy())
             
 
     # Render debug output: optional video and projected image and W vector.
