@@ -99,10 +99,12 @@ def project(
             np.float32)       # [N, 1, C]
         w_avg = np.mean(w_samples, axis=0, keepdims=True)      # [1, 1, C]
         w_std = (np.sum((w_samples - w_avg) ** 2) / w_avg_samples) ** 0.5
-        w_avg_tensor = torch.tensor(w_avg, dtype=torch.float32, device=device)
 
-        w_opt = torch.tensor(w_avg, dtype=torch.float32, device=device,
-                            requires_grad=True)  # pylint: disable=not-callable
+        w_avg_mixin_expanded = np.repeat(w_avg, G.mapping.num_ws, 1)
+
+        w_avg_tensor = torch.tensor(w_avg_mixin_expanded, dtype=torch.float32, device=device)
+        w_opt = torch.tensor(w_avg_mixin_expanded, dtype=torch.float32, device=device, requires_grad=True)  # pylint: disable=not-callable
+
 
     w_opt_prev = w_opt.clone().detach()
     # w_opt_prev_expanded = w_opt_prev.repeat([1, G.mapping.num_ws, 1])
@@ -134,13 +136,12 @@ def project(
             buf[:] = torch.randn_like(buf)
             buf.requires_grad = True
 
+    if first_iter:
+        params = [w_opt] + list(noise_bufs.values())
+    else: # Keep noise fixed for consecutive iterations
+        params = [w_opt]
 
-
-    # w_out = torch.zeros([num_steps] + list(w_opt.shape[1:]),
-    #                     dtype=torch.float32, device=device)
-    if optimizer is None:
-        optimizer = torch.optim.Adam(
-            [w_opt] + list(noise_bufs.values()), betas=(0.9, 0.999), lr=initial_learning_rate)
+    optimizer = torch.optim.Adam(params, betas=(0.9, 0.999), lr=initial_learning_rate)
 
     # Get heat map
     target_images_landmarks = target_landmarks.unsqueeze(
@@ -172,7 +173,7 @@ def project(
 
         # Synth images from opt_w.
         w_noise = torch.randn_like(w_opt) * w_noise_scale
-        ws = (w_opt + w_noise).repeat([1, G.mapping.num_ws, 1])
+        ws = w_opt + w_noise
         synth_images = G.synthesis(ws, noise_mode='const', force_fp32=True)
 
         if D:
@@ -244,7 +245,7 @@ def project(
 
     # a =  w_out.repeat([1, G.mapping.num_ws, 1])
 
-    return w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, optimizer, synth_images
+    return w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, synth_images
 
 # ----------------------------------------------------------------------------
 
@@ -354,7 +355,7 @@ def run_projection(
 
         # Optimize projection.
         start_time = perf_counter()
-        w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, optimizer, synth_image = project(
+        w_opt, w_std, w_avg_tensor, noise_bufs, vgg16, target_features, synth_image = project(
             G,
             D,
             FLE,
@@ -373,7 +374,6 @@ def run_projection(
             noise_bufs=noise_bufs,
             vgg16=vgg16,
             target_features=target_features,
-            optimizer=optimizer,
             discriminator_weight=d_weight,
             fidelity_weight=fidelity_weight,
             smoothness_weight=smoothness_weight,
@@ -385,7 +385,7 @@ def run_projection(
         # target_pil_landmarks.save(f'{outdir}/target_landmarks.png')
         # projected_w = projected_w_steps[-1]
 
-        w_opt_expanded = w_opt.clone().detach().repeat([1, G.mapping.num_ws, 1])
+        w_opt_expanded = w_opt.clone().detach()
 
         for j in range(2):
             if j == 0:
@@ -396,7 +396,6 @@ def run_projection(
                 
             elif j == 1:
                 synth_image = G.synthesis(w_opt_expanded, noise_mode='const', force_fp32=True)
-            
             
             # print(i,f'{outdir}/proj_{0}.png'.format(i))
             synth_image = (synth_image + 1) * (255/2)
