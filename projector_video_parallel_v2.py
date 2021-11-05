@@ -203,6 +203,7 @@ def load_image(path, img_res):
 @click.option('--num-steps-first',        help='Number of optimization steps for consecutive iterations', type=int, default=1000, show_default=True)
 @click.option('--num-steps',              help='Number of optimization steps for consecutive iterations', type=int, default=100, show_default=True)
 @click.option('--lpips_weight',           help='Weighting factor of lpips loss', type=float, default=2.0, show_default=True)
+@click.option('--lpips_weight_second',    help='Weighting factor of lpips loss for second iteration', type=float, default=2.0, show_default=True)
 @click.option('--landmark_weight',        help='Weighting factor of landmark loss', type=float, default=0.1, show_default=True)
 @click.option('--seed',                   help='Random seed', type=int, default=303, show_default=True)
 # @click.option('--save-video',             help='Save an mp4 video of optimization progress', type=bool, default=True, show_default=True)
@@ -226,7 +227,8 @@ def run_projection(
     device: str,
     landmark_weights: str,
     fidelity_weight:float,
-    smoothness_weight:float
+    smoothness_weight:float,
+    lpips_weight_second:float
 ):
     """Project given image to the latent space of pretrained network pickle.
 
@@ -301,7 +303,7 @@ def run_projection(
 
 
     # Create initial Ws, minimize lpips loss
-    w_opts, _, noise_bufs = project(
+    w_initial, _, noise_bufs = project(
         G,
         FLE,
         target=torch.tensor(target_look_uint8.transpose(
@@ -320,7 +322,7 @@ def run_projection(
         num_steps=num_steps_first
     )
     # Save initial
-    synth_image = G.synthesis(w_opts, noise_mode='const', force_fp32=True)
+    synth_image = G.synthesis(w_initial, noise_mode='const', force_fp32=True)
     synth_image = (synth_image + 1) * (255/2)
     synth_image = synth_image.permute(0, 2, 3, 1).clamp(
         0, 255).to(torch.uint8)[0].cpu().numpy()
@@ -337,8 +339,8 @@ def run_projection(
         device=device,
         w_opts=w_opts,
         w_std=w_std,
-        w_fidelity=w_opts,
-        lpips_weight=0,
+        w_fidelity=w_initial,
+        lpips_weight=lpips_weight_second,
         landmark_weight=landmark_weight,
         verbose=True, 
         fidelity_weight=fidelity_weight,
