@@ -224,7 +224,7 @@ def run_projection(
     # Load networks.
     print('Loading networks from "%s"...' % network_pkl)
 
-    landmark_weights_array = np.array(landmark_weights.split(','), dtype=np.float)
+    landmark_weights_array = np.array(landmark_weights.split(','), dtype=float)
     FLE = FacialLandmarksExtractor(device=device, landmark_weights=landmark_weights_array)
 
     device = torch.device(device)

@@ -14,7 +14,7 @@ from torch._C import Value
 class FacialLandmarksExtractor:
     def __init__(self, device='cuda', landmark_weights=None):
         self.fa = face_alignment.FaceAlignment(
-            face_alignment.LandmarksType._2D, flip_input=False, device=device)
+            face_alignment.LandmarksType.TWO_D, flip_input=False, device=device)
         
         self.resolution = 256
 
